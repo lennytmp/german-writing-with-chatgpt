@@ -1,0 +1,11 @@
+runtime/
+node_modules/
+.env
+.env.*
+auth.json
+*spielstand*.json
+*.log
+Vorschau.png
+Pruefstatus.txt
+.DS_Store
+Thumbs.db

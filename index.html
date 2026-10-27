@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="game-token" content="__GAME_TOKEN__"><title>Schicksalsprobe · Deutsch-Abenteuer</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="topbar"><a class="brand" href="/" aria-label="Schicksalsprobe Start"><span class="emblem">⚔</span><span>SCHICKSALSPROBE<small>DEIN DEUTSCH. DEIN ABENTEUER.</small></span></a><div class="connection"><span id="connectionDot"></span><span id="connectionText">Verbinde …</span></div><button id="soundBtn" class="sound-btn" type="button" aria-pressed="true" aria-label="Ton ausschalten" title="Ton ausschalten"><span id="soundIcon" aria-hidden="true">♫</span><span id="soundLabel">Ton an</span></button><button id="exitBtn" class="icon-btn" title="Lokales Spiel beenden" aria-label="Spiel beenden">⏻</button></header>
+<main>
+<section class="hero"><div><p class="eyebrow">DAS ABENTEUER GEHT WEITER</p><h1>Worte sind deine Stärke.</h1><p class="intro">Schreibe Deutsch. Meistere Fehler. Werde stärker.</p></div><div class="level-seal"><span id="level">1</span><small>STUFE</small></div></section>
+<section class="stats" aria-label="Spielstand">
+<div class="stat"><div class="stat-label"><span>♥ GESUNDHEIT</span><strong id="hpText">95 / 100</strong></div><progress id="hpBar" max="100" value="95" aria-label="Gesundheit"></progress><small id="hpNote">Jede Verbesserung macht dich stärker.</small></div>
+<div class="stat"><div class="stat-label"><span>✦ ERFAHRUNG</span><strong id="xpText">0 / 100 XP</strong></div><progress id="xpBar" max="100" value="0" aria-label="Erfahrung bis zum nächsten Level"></progress><small id="xpNote">Noch 100 XP bis Stufe 2</small></div>
+<div class="streak-stat"><span class="streak-icon">♨</span><strong id="streak">0</strong><small>SERIE</small></div>
+</section>
+<div class="play-layout">
+<section class="writing panel">
+<div class="section-head"><span class="eyebrow">DEINE SCHREIBMISSION</span><button id="inspireBtn" class="text-btn">↻ Neuer Impuls</button></div>
+<div class="quest"><div class="quest-symbol">⌁</div><div><h2 id="questTitle">Der letzte Zug</h2><p id="questText">Du hast deinen Zug verpasst. Erkläre am Schalter, was passiert ist und welche Hilfe du brauchst.</p></div></div>
+<div id="correctionHint" class="correction-hint" hidden></div>
+<label class="sr-only" for="sentence">Dein deutscher Text</label>
+<textarea id="sentence" rows="5" maxlength="3000" placeholder="Schreibe deinen Satz oder einen kurzen Text …" spellcheck="false"></textarea>
+<div class="input-meta"><span id="wordCount">0 Wörter</span><span>Strg + Enter zum Prüfen</span></div>
+<div class="submit-row"><div class="stakes"><span id="rewardLabel">✦ +15 XP</span><span id="penaltyLabel">♥ −5 HP bei Fehler</span></div><button id="submitBtn" class="primary">Text prüfen <span>→</span></button><button id="cancelBtn" class="secondary" hidden>Abbrechen</button></div>
+<div id="processing" class="processing" hidden role="status"><span class="rune">✦</span><div><strong id="processingTitle">Das Orakel prüft deinen Text …</strong><p id="processingDetail">Ein KI-Aufruf · keine Chat-Übergabe</p></div><span id="timer">0 s</span></div>
+<div id="feedback" tabindex="-1" aria-live="polite"></div>
+</section>
+<aside class="side">
+<section class="panel adventure"><p class="eyebrow">DEIN WEG</p><div class="map" aria-hidden="true"><span class="map-star">✧</span><span class="map-path"></span><span class="map-node active">1</span><span class="map-node">2</span><span class="map-node">3</span><span class="map-castle">♜</span></div><h2 id="rank">Wortwanderer</h2><p id="journey">Die erste Etappe beginnt mit einem Satz.</p><div class="adventure-meta"><span>Gemeistert</span><strong id="masteredCount">0 Texte</strong></div><div class="adventure-meta"><span>Prüfungen</span><strong id="checksCount">0</strong></div></section>
+<section class="rules"><h3>So wirst du stärker</h3><p><b>+15 XP · +5 HP</b> für einen fehlerfreien Text.</p><p><b>−5 HP</b> für einen Text mit sicheren Fehlern.</p><p><b>+10 XP · +5 HP</b> wenn du ihn verbesserst.</p><p>Stilvorlieben und unsichere Bewertungen kosten keine HP.</p></section>
+</aside>
+</div>
+<section class="chronicle panel"><div class="section-head"><div><p class="eyebrow">DEIN FORTSCHRITT</p><h2>Chronik der Sätze</h2></div><span id="saveStatus">● Lokal gespeichert</span></div><div class="backup-actions"><button id="exportSaveBtn" class="secondary" type="button">↓ Spielstand sichern</button><button id="importSaveBtn" class="secondary" type="button">↑ Spielstand laden</button><input id="importSaveFile" type="file" accept=".json,application/json" hidden></div><div id="importPreview" class="import-preview" hidden><strong>Spielstand wiederherstellen?</strong><p id="importSummary"></p><p>Dein aktueller Stand wird vorher als Sicherheitskopie im Browser aufbewahrt.</p><button id="confirmImportBtn" class="primary" type="button">Diesen Spielstand laden</button> <button id="cancelImportBtn" class="secondary" type="button">Abbrechen</button></div><div id="history"></div></section>
+<footer>Die KI kann Fehler übersehen. Deine Texte werden zur Prüfung an OpenAI gesendet. <span>Spielstand bleibt in diesem Browser.</span></footer>
+</main>
+<div id="toast" role="status"></div>
+</body></html>

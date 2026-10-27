@@ -1,0 +1,40 @@
+DEUTSCHE SCHICKSALSPROBE — DEUTSCH-ABENTEUER
+
+STARTEN
+Doppelklick auf „Spiel starten.vbs“. Das Spiel öffnet sich in einem eigenen Fenster ohne Chat.
+Falls VBS nicht verfügbar ist: „Start-Spiel.cmd“ verwenden.
+Nicht index.html direkt öffnen: Der lokale Dienst wird über das Startprogramm bereitgestellt.
+
+VORAUSSETZUNGEN
+Node.js und Codex sind auf diesem Computer installiert.
+Codex muss mit deinem ChatGPT-Konto angemeldet sein. Falls nötig einmal im Terminal: codex login
+Kein separater API-Schlüssel. Die KI-Prüfung erfolgt online über dein ChatGPT-Konto und nutzt dessen Codex-Kontingent.
+
+SPIELREGELN
+Schreibe frei oder nutze den Schreibimpuls.
+„Text prüfen“ bzw. Strg+Enter prüft direkt im Spiel.
+Fehlerfrei: +15 XP und +5 HP. Maximal 100 HP.
+Sichere Fehler: −5 HP pro neuer Runde. Weitere Überarbeitungen derselben Runde kosten keine zusätzlichen HP.
+Erfolgreiche Korrektur: +10 XP und +5 HP.
+100 XP pro Level. Gemeisterte Texte geben nicht mehrfach Punkte.
+Keine lokalen Grammatikregeln, keine Strafe für bloße Stilvorlieben oder unsichere Urteile.
+Letzter bekannter Spielstand: 95 HP, 0 XP. Dein Korrekturversuch ist übernommen.
+
+WARTEZEIT
+Ein einziger KI-Aufruf pro Text. Codex benötigt Anlaufzeit; sofortige Antworten werden nicht garantiert.
+Vorübergehende Verbindungsfehler werden ohne feste Versuchszahl wiederholt. Du kannst jederzeit abbrechen.
+Anmelde- und Kontingentprobleme werden als solche angezeigt.
+
+BEENDEN UND DATEN
+Der Ausschaltknopf oben rechts beendet den lokalen Dienst.
+Nur das Fenster zu schließen lässt ihn für einen schnellen Neustart weiterlaufen.
+Spielstände werden lokal in diesem Browser gespeichert. Ein anderer Browser oder gelöschte Browserdaten können den Spielstand entfernen.
+Der Dienst lauscht nur auf 127.0.0.1:8787. Texte werden zur Prüfung an OpenAI gesendet.
+Codex verwaltet die Anmeldung. Das Spiel kopiert keine Zugangsdaten.
+KI-Bewertungen bleiben fehlbar.
+
+SPIELSTAND ALS DATEI
+Unter der Chronik: „Spielstand sichern“ lädt eine JSON-Sicherung herunter.
+„Spielstand laden“ stellt sie nach Vorschau wieder her.
+GitHub sichert den Code; Browser-Spielstände müssen separat exportiert werden.
+Details stehen in README.md.
