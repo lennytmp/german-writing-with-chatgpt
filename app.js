@@ -116,7 +116,7 @@ function wordDiff(before,after){
 function renderTasks(){
   const waiting=state.tasks.filter(t=>t.status==='queued');
   const active=state.tasks.filter(t=>['checking','retrying'].includes(t.status));
-  const finished=state.tasks.filter(t=>!Model.isOpen(t));
+  const finished=state.tasks.filter(t=>!Model.isOpen(t)&&t.status!=='cancelled').sort((a,b)=>b.number-a.number).slice(0,20);
   const open=waiting.length+active.length;
   const summary=state.hp===0?'Abenteuer beendet · '+open+' Texte warten auf deinen neuen Versuch':state.queuePaused?'Prüfung pausiert · '+open+(open===1?' Text offen':' Texte offen'):open?active.length+' in Prüfung · '+waiting.length+' warten':'Alle Prüfungen abgeschlossen';
   $('queueSummary').textContent=summary;
@@ -124,8 +124,8 @@ function renderTasks(){
   $('queueHelp').textContent=state.hp===0?'Bei 0 HP werden keine weiteren Texte geprüft. Nach „Neuer Versuch“ geht es mit den gespeicherten Texten weiter.':state.queuePaused?(state.pauseReason+' Du kannst weiter Texte einreihen.'):'Die Texte werden nacheinander geprüft. Du kannst währenddessen weiterschreiben.';
   $('resumeQueueBtn').hidden=!state.queuePaused;
   $('cancelAllBtn').hidden=open<2;
-  const displayed=[...state.tasks.filter(Model.isOpen).sort((a,b)=>a.number-b.number),...finished.sort((a,b)=>b.number-a.number)];
-  $('taskList').innerHTML=displayed.length?displayed.map(task=>{
+  const displayed=state.tasks.filter(Model.isOpen).sort((a,b)=>a.number-b.number);
+  const card=task=>{
     const root=Model.rootTask(state,task),pending=Model.isOpen(task),busy=root&&Model.correctionBusy(state,root.id);
     const result=task.result;
     const waitingIndex=waiting.findIndex(t=>t.id===task.id);
@@ -137,7 +137,7 @@ function renderTasks(){
     if(result?.errors?.length)resultHtml+='<ul>'+result.errors.map(e=>'<li>'+esc(e.explanation)+'</li>').join('')+'</ul>';
     if(task.status==='incorrect'&&task.resolved)resultHtml+='<p class="task-resolved">Durch eine Korrektur gemeistert.</p>';
     const actions=[];
-    if(pending)actions.push('<button class="text-btn" data-action="cancel" data-task-id="'+esc(task.id)+'">Abbrechen</button>');
+    if(pending)actions.push('<button class="text-btn" data-action="cancel" data-task-id="'+esc(task.id)+'" title="Prüfung abbrechen und entfernen">Entfernen</button>');
     if(task.status==='incorrect'&&root&&!root.resolved){
       actions.push('<button class="secondary" data-action="correct" data-task-id="'+esc(task.id)+'"'+(busy||exiting?' disabled':'')+'>'+(busy?'Korrektur ist eingereiht':'Diesen Text korrigieren')+'</button>');
     }
@@ -146,7 +146,9 @@ function renderTasks(){
     const solution=task.showSolution&&result?.correctedSentence?'<div class="diff"><span class="correction-label">Änderungen</span><p>'+wordDiff(task.sentence,result.correctedSentence)+'</p></div>':'';
     const elapsed=task.startedAt&&pending?Math.max(0,Math.floor((Date.now()-task.startedAt)/1000)):null;
     return '<article class="task-card '+esc(task.status)+(task.resolved?' resolved':'')+'" id="job-'+esc(task.id)+'"><div class="task-heading"><strong>Text #'+task.number+'</strong>'+(task.correctionOf&&root?'<span class="task-relation">Korrektur zu #'+root.number+'</span>':'')+'<span class="task-status">'+(task.status==='checking'?'<span class="small-spinner" aria-hidden="true"></span>':'')+esc(taskStatus(task))+'</span></div><p class="task-sentence">'+esc(task.sentence)+'</p>'+(detail?'<p class="task-detail">'+esc(detail)+(elapsed!==null?' <span data-job-time="'+esc(task.id)+'">'+elapsed+' s</span>':'')+'</p>':'')+resultHtml+solution+'<div class="task-bottom"><span class="task-delta">'+esc(task.delta)+'</span><div class="task-actions">'+actions.join('')+'</div></div></article>';
-  }).join(''):'<p class="history-empty">Deine eingereichten Texte erscheinen hier – jeder mit seinem eigenen Ergebnis.</p>';
+  };
+  $('taskList').innerHTML=displayed.length?displayed.map(card).join(''):'<p class="history-empty">Keine aktiven Prüfungen. Ergebnisse findest du in der Chronik.</p>';
+  $('resultsList').innerHTML=finished.map(card).join('');
 }
 function render(){
   const level=Math.floor(state.xp/100)+1,p=state.xp%100;
@@ -158,7 +160,7 @@ function render(){
   $('journey').textContent=state.mastered.length?'Du hast '+state.mastered.length+' Texte gemeistert.':'Die erste Etappe beginnt mit einem Satz.';
   $('masteredCount').textContent=state.mastered.length+' Texte';$('checksCount').textContent=state.checks;
   $('questTitle').textContent=missions[state.mission].title;$('questText').textContent=missions[state.mission].text;
-  $('history').innerHTML=state.history.length?state.history.slice(0,20).map(r=>'<article class="history-item '+(r.verdict==='incorrect'?'incorrect':'')+'"><span class="history-icon">'+(r.verdict==='correct'?'✓':r.verdict==='incorrect'?'✕':'◇')+'</span><div><p>'+(r.number?'#'+r.number+' · ':'')+esc(r.sentence)+'</p><small>'+esc(r.explanation)+' · '+new Date(r.time).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+'</small></div><span class="history-delta">'+esc(r.delta)+'</span></article>').join(''):'<p class="history-empty">Dein nächster Satz schreibt Geschichte.</p>';
+  $('history').innerHTML=state.history.length?state.history.filter(r=>!state.tasks.some(t=>t.status!=='cancelled'&&!Model.isOpen(t)&&(t.id===r.taskId||(t.legacy&&t.sentence===r.sentence)))).slice(0,20).map(r=>'<article class="history-item '+(r.verdict==='incorrect'?'incorrect':'')+'"><span class="history-icon">'+(r.verdict==='correct'?'✓':r.verdict==='incorrect'?'✕':'◇')+'</span><div><p>'+(r.number?'#'+r.number+' · ':'')+esc(r.sentence)+'</p><small>'+esc(r.explanation)+' · '+new Date(r.time).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+'</small></div><span class="history-delta">'+esc(r.delta)+'</span></article>').join(''):'<p class="history-empty">Dein nächster Satz schreibt Geschichte.</p>';
   renderComposer();renderTasks();count();
 }
 function switchToFree(){
@@ -250,7 +252,7 @@ function pump(){
 function cancelTask(id){
   if(Model.cancel(state,id)){controllers.get(id)?.abort();save();render();pump();}
 }
-$('taskList').addEventListener('click',event=>{
+function handleTaskAction(event){
   const button=event.target.closest('button[data-task-id]');if(!button||exiting)return;
   const task=state.tasks.find(t=>t.id===button.dataset.taskId);if(!task)return;
   if(button.dataset.action==='cancel')cancelTask(task.id);
@@ -259,7 +261,9 @@ $('taskList').addEventListener('click',event=>{
   else if(button.dataset.action==='retry'){
     try{if(Model.retry(state,task.id)){save();render();pump();}}catch(error){notice(error.message);}
   }
-});
+}
+$('taskList').addEventListener('click',handleTaskAction);
+$('resultsList').addEventListener('click',handleTaskAction);
 $('cancelAllBtn').addEventListener('click',()=>{
   for(const task of state.tasks)if(Model.isOpen(task)){Model.cancel(state,task.id);controllers.get(task.id)?.abort();}
   state.queuePaused=false;state.pauseReason='';save();render();

@@ -229,3 +229,20 @@ test('Submitting an AI-suggested correction as free writing still cannot heal',(
   const correction=Model.enqueue(s,'Ich bin hier.');assert.equal(correction.correctionOf,bad.id);
   Model.complete(s,correction,ok(correction.sentence));assert.equal(s.hp,85);assert.equal(s.xp,10);assert(bad.resolved);
 });
+
+test('Only open tasks appear in the queue; completed results and correction controls move to history',async()=>{
+  const u=setupUI();u.elements.sentence.value='Ich ist hier.';u.ui.submitText();
+  assert(u.elements.taskList.innerHTML.includes('Ich ist hier.'));assert(u.elements.taskList.innerHTML.includes('Entfernen'));
+  u.elements.sentence.value='Mein Entwurf';
+  await u.finish(0,wrong('Ich ist hier.','Ich bin hier.'));
+  assert(!u.elements.taskList.innerHTML.includes('Ich ist hier.'));assert(u.elements.taskList.innerHTML.includes('Keine aktiven'));
+  assert(u.elements.resultsList.innerHTML.includes('Ich ist hier.'));assert(u.elements.resultsList.innerHTML.includes('Diesen Text korrigieren'));
+  assert(!u.elements.history.innerHTML.includes('Ich ist hier.'));assert.equal(u.elements.sentence.value,'Mein Entwurf');await u.cleanup();
+});
+test('Removing a waiting task hides it without scoring and skips it when the queue advances',async()=>{
+  const u=setupUI();for(const text of ['Erster Text.','Zweiter Text.','Dritter Text.']){u.elements.sentence.value=text;u.ui.submitText();}
+  const removed=u.ui.getState().tasks[1];u.ui.cancelTask(removed.id);
+  assert(!u.elements.taskList.innerHTML.includes('Zweiter Text.'));assert(!u.elements.resultsList.innerHTML.includes('Zweiter Text.'));
+  assert.equal(u.requests.length,1);assert.equal(u.ui.getState().checks,0);
+  await u.finish(0,ok('Erster Text.'));assert.equal(u.requests[1].sentence,'Dritter Text.');await u.cleanup();
+});

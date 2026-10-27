@@ -43,3 +43,5 @@ Unter der Chronik: „Spielstand sichern“ lädt eine JSON-Sicherung herunter.
 „Spielstand laden“ stellt sie nach Vorschau wieder her.
 GitHub sichert den Code; Browser-Spielstände müssen separat exportiert werden.
 Details stehen in README.md.
+
+Unter „Deine Prüfungen“ stehen ausschließlich aktive und wartende Prüfungen. „Entfernen“ bricht den gewählten Auftrag ohne Wertung ab. Ergebnisse und Korrektur-Schaltflächen findest du in der Chronik.

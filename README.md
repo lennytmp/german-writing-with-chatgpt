@@ -64,3 +64,5 @@ KI-Bewertungen können Fehler enthalten.
 
 Das Repository dient der Sicherung und Versionsverwaltung des Codes. Das Spiel läuft weiterhin lokal.
 Am einfachsten zunächst ein privates Repository verwenden. Zugangsdaten und exportierte Spielstände nicht hochladen.
+
+Unter „Deine Prüfungen“ stehen ausschließlich aktive und wartende Prüfungen. „Entfernen“ bricht den gewählten Auftrag ohne Wertung ab. Ergebnisse und Korrektur-Schaltflächen findest du in der Chronik.
