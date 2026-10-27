@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="game-token" content="__GAME_TOKEN__"><title>Schicksalsprobe · Deutsch-Abenteuer</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="game-token" content="__GAME_TOKEN__"><title>Schicksalsprobe · Deutsch-Abenteuer</title><link rel="stylesheet" href="/style.css"><script src="/game-state.js" defer></script><script src="/app.js" defer></script></head>
 <body>
 <header class="topbar"><a class="brand" href="/" aria-label="Schicksalsprobe Start"><span class="emblem">⚔</span><span>SCHICKSALSPROBE<small>DEIN DEUTSCH. DEIN ABENTEUER.</small></span></a><div class="connection"><span id="connectionDot"></span><span id="connectionText">Verbinde …</span></div><button id="soundBtn" class="sound-btn" type="button" aria-pressed="true" aria-label="Ton ausschalten" title="Ton ausschalten"><span id="soundIcon" aria-hidden="true">♫</span><span id="soundLabel">Ton an</span></button><button id="exitBtn" class="icon-btn" title="Lokales Spiel beenden" aria-label="Spiel beenden">⏻</button></header>
 <main>
@@ -17,8 +17,8 @@
 <label class="sr-only" for="sentence">Dein deutscher Text</label>
 <textarea id="sentence" rows="5" maxlength="3000" placeholder="Schreibe deinen Satz oder einen kurzen Text …" spellcheck="false"></textarea>
 <div class="input-meta"><span id="wordCount">0 Wörter</span><span>Strg + Enter zum Prüfen</span></div>
-<div class="submit-row"><div class="stakes"><span id="rewardLabel">✦ +15 XP</span><span id="penaltyLabel">♥ −5 HP bei Fehler</span></div><button id="submitBtn" class="primary">Text prüfen <span>→</span></button><button id="cancelBtn" class="secondary" hidden>Abbrechen</button></div>
-<div id="processing" class="processing" hidden role="status"><span class="rune">✦</span><div><strong id="processingTitle">Das Orakel prüft deinen Text …</strong><p id="processingDetail">Ein KI-Aufruf · keine Chat-Übergabe</p></div><span id="timer">0 s</span></div>
+<div class="submit-row"><div class="stakes"><span id="rewardLabel">✦ +15 XP</span><span id="penaltyLabel">♥ −5 HP bei Fehler</span></div><button id="submitBtn" class="primary">Text einreihen <span>→</span></button></div>
+<p id="submitNotice" class="submit-notice" role="status" aria-live="polite">Absenden, weiterschreiben – die Prüfung läuft im Hintergrund.</p><div class="queue-inline"><span id="queueInline">Bereit für deinen nächsten Text</span><a href="#queueTitle">Prüfungen ansehen ↓</a></div>
 <div id="feedback" tabindex="-1" aria-live="polite"></div>
 </section>
 <aside class="side">
@@ -26,6 +26,7 @@
 <section class="rules"><h3>So wirst du stärker</h3><p><b>+15 XP · +5 HP</b> für einen fehlerfreien Text.</p><p><b>−5 HP</b> für einen Text mit sicheren Fehlern.</p><p><b>+10 XP · +5 HP</b> wenn du ihn verbesserst.</p><p>Stilvorlieben und unsichere Bewertungen kosten keine HP.</p></section>
 </aside>
 </div>
+<section class="queue-panel panel" aria-labelledby="queueTitle"><div class="section-head"><div><p class="eyebrow">ALLES BLEIBT ZUGEORDNET</p><h2 id="queueTitle">Deine Prüfungen</h2></div><strong id="queueSummary" class="queue-summary"></strong></div><p id="queueHelp" class="queue-help">Du kannst während der Prüfung weiterschreiben.</p><div class="queue-controls"><button id="resumeQueueBtn" class="secondary" hidden>Prüfungen fortsetzen</button><button id="cancelAllBtn" class="text-btn" hidden>Alle offenen Prüfungen abbrechen</button></div><div id="taskList"></div><p id="queueAnnouncements" class="sr-only" role="status" aria-live="polite"></p></section>
 <section class="chronicle panel"><div class="section-head"><div><p class="eyebrow">DEIN FORTSCHRITT</p><h2>Chronik der Sätze</h2></div><span id="saveStatus">● Lokal gespeichert</span></div><div class="backup-actions"><button id="exportSaveBtn" class="secondary" type="button">↓ Spielstand sichern</button><button id="importSaveBtn" class="secondary" type="button">↑ Spielstand laden</button><input id="importSaveFile" type="file" accept=".json,application/json" hidden></div><div id="importPreview" class="import-preview" hidden><strong>Spielstand wiederherstellen?</strong><p id="importSummary"></p><p>Dein aktueller Stand wird vorher als Sicherheitskopie im Browser aufbewahrt.</p><button id="confirmImportBtn" class="primary" type="button">Diesen Spielstand laden</button> <button id="cancelImportBtn" class="secondary" type="button">Abbrechen</button></div><div id="history"></div></section>
 <footer>Die KI kann Fehler übersehen. Deine Texte werden zur Prüfung an OpenAI gesendet. <span>Spielstand bleibt in diesem Browser.</span></footer>
 </main>

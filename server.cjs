@@ -100,7 +100,7 @@ function createServer() {
     if(req.headers.host!=='127.0.0.1:'+PORT && req.headers.host!=='localhost:'+PORT){send(res,403,{error:'Zugriff nur lokal erlaubt.'});return;}
     if(req.method==='GET' && target.pathname==='/api/health'){send(res,200,{app:'deutsche-schicksalsprobe-local',available:!!CODEX,provider:'ChatGPT über Codex'});return;}
     if(req.method==='GET'){
-      const names={'/':'index.html','/style.css':'style.css','/app.js':'app.js'};
+      const names={'/':'index.html','/style.css':'style.css','/app.js':'app.js','/game-state.js':'game-state.js'};
       const name=names[target.pathname];
       if(!name){send(res,404,{error:'Nicht gefunden.'});return;}
       let content=fs.readFileSync(path.join(ROOT,name),'utf8');

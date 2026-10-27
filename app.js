@@ -1,7 +1,8 @@
 'use strict';
 (() => {
 const $=id=>document.getElementById(id);
-const input=$('sentence'),submit=$('submitBtn'),feedback=$('feedback'),cancel=$('cancelBtn'),KEY='schicksalsprobe_local_v4';
+const input=$('sentence'),submit=$('submitBtn'),feedback=$('feedback'),KEY='schicksalsprobe_local_v4';
+const Model=window.SchicksalState;
 // Synthesized game audio; activated only by a user interaction.
 let audioCtx=null,audioMaster=null,soundEnabled=true;
 try { soundEnabled=localStorage.getItem(KEY+'_sound')!=='off'; } catch {}
@@ -55,6 +56,7 @@ $('soundBtn').addEventListener('click',()=>{
 });
 renderSound();
 
+
 const missions=[
 {title:'Der letzte Zug',text:'Du hast deinen Zug verpasst. Erkläre am Schalter, was passiert ist und welche Hilfe du brauchst.'},
 {title:'Ein unerwarteter Fund',text:'Auf einer Parkbank liegt ein alter Schlüssel. Beschreibe deinen Fund und was du damit machen möchtest.'},
@@ -68,200 +70,267 @@ const seed={hp:95,xp:0,streak:0,checks:1,mission:0,mastered:[],
 draft:'Guten Tag! Ich habe meinen Zug verpasst. Wann fäjhrt der nächsten?',
 pending:{original:'Guten Tag! Ich habe meinen Zug verpasst. Wann fäjhrt der nächsten?',hint:'Prüfe den Tippfehler in „fäjhrt“ und die Endung von „nächsten“ (Nominativ).'},
 history:[{sentence:'Guten Tag! Ich habe meinen Zug verpasst. Wann fäjhrt der nächsten?',verdict:'incorrect',delta:'−5 HP',explanation:'Tippfehler und Adjektivendung · Überarbeitung offen',time:Date.now()}]};
-let state=structuredClone(seed),running=false,exiting=false,controller=null,ticker=null,started=0;
-try{
-const saved=JSON.parse(localStorage.getItem(KEY));
-if(saved&&typeof saved==='object'){
-state={...seed,...saved};
-for(const k of ['hp','xp','streak','checks','mission'])if(!Number.isFinite(state[k]))state[k]=seed[k];
-state.hp=Math.max(0,Math.min(100,state.hp));state.xp=Math.max(0,state.xp);
-state.mission=Math.abs(Math.floor(state.mission))%missions.length;
-state.mastered=Array.isArray(state.mastered)?state.mastered.filter(x=>typeof x==='string').slice(-500):[];
-state.history=Array.isArray(state.history)?state.history.slice(0,40):[];
-if(!state.pending||typeof state.pending.original!=='string')state.pending=null;
-state.draft=typeof state.draft==='string'?state.draft:'';
-}}catch{}
+
+let state,exiting=false,leaving=false;
+const controllers=new Map();
+try{const raw=JSON.parse(localStorage.getItem(KEY));state=Model.hydrate(raw||seed,missions.length);}
+catch{state=Model.hydrate(seed,missions.length);}
 input.value=state.draft;
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function key(s){return s.normalize('NFC').trim().replace(/\s+/g,' ');}
-function save(){state.draft=input.value;try{localStorage.setItem(KEY,JSON.stringify(state));$('saveStatus').textContent='● Lokal gespeichert';}catch{$('saveStatus').textContent='Speichern nicht möglich';}}
+function save(){
+  state.draft=input.value;if(!state.draftTarget)state.freeDraft=input.value;
+  Model.prune(state);
+  try{localStorage.setItem(KEY,JSON.stringify(state));$('saveStatus').textContent='● Lokal gespeichert';}
+  catch{$('saveStatus').textContent='Nicht gespeichert – bitte Spielstand exportieren';}
+}
 function count(){const n=input.value.trim()?input.value.trim().split(/\s+/).length:0;$('wordCount').textContent=n+' '+(n===1?'Wort':'Wörter');}
-function render(){
-const level=Math.floor(state.xp/100)+1,p=state.xp%100;
-$('hpText').textContent=state.hp+' / 100';$('hpBar').value=state.hp;
-$('xpText').textContent=p+' / 100 XP';$('xpBar').value=p;$('level').textContent=level;$('streak').textContent=state.streak;
-$('xpNote').textContent='Noch '+(100-p)+' XP bis Stufe '+(level+1);
-$('hpNote').textContent=state.hp===0?'Zweite Chance: Verbessere einen Text und gewinne HP zurück.':'Jede Verbesserung macht dich stärker.';
-$('rank').textContent=level<3?'Wortwanderer':level<5?'Satzschmied':level<10?'Sprachritter':'Meister der Worte';
-$('journey').textContent=state.mastered.length?'Du hast '+state.mastered.length+' Texte gemeistert.':'Die erste Etappe beginnt mit einem Satz.';
-$('masteredCount').textContent=state.mastered.length+' Texte';$('checksCount').textContent=state.checks;
-$('questTitle').textContent=missions[state.mission].title;$('questText').textContent=missions[state.mission].text;
-$('rewardLabel').textContent=state.pending?'✦ +10 XP · +5 HP für deine Korrektur':'✦ +15 XP · +5 HP';
-$('penaltyLabel').textContent=state.pending?'♥ Keine weitere Strafe für diese Runde':'♥ −5 HP bei Fehler';
-$('correctionHint').hidden=!state.pending;
-$('correctionHint').innerHTML=state.pending?esc(state.pending.hint||'Verbessere deinen letzten Text.')+' <button class="text-btn" id="newTextBtn">Neuen Text beginnen</button>':'';
-$('newTextBtn')?.addEventListener('click',()=>{if(running)return;state.pending=null;input.value='';save();render();input.focus();});
-$('inspireBtn').disabled=running;
-$('history').innerHTML=state.history.length?state.history.slice(0,20).map(r=>'<article class="history-item '+(r.verdict==='incorrect'?'incorrect':'')+'"><span class="history-icon">'+(r.verdict==='correct'?'✓':r.verdict==='incorrect'?'✕':'◇')+'</span><div><p>'+esc(r.sentence)+'</p><small>'+esc(r.explanation)+' · '+new Date(r.time).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+'</small></div><span class="history-delta">'+esc(r.delta)+'</span></article>').join(''):'<p class="history-empty">Dein nächster Satz schreibt Geschichte.</p>';
-count();
-}
-input.addEventListener('input',()=>{count();save();});
-input.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();evaluate();}});
-$('inspireBtn').addEventListener('click',()=>{if(running)return;state.mission=(state.mission+1)%missions.length;playSound('idea');save();render();});
+function notice(message){$('submitNotice').textContent=message;}
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3500);}
-function showFeedback(kind,title,body,delta=''){
-feedback.innerHTML='<div class="feedback '+kind+'"><h3>'+esc(title)+(delta?'<span class="delta">'+esc(delta)+'</span>':'')+'</h3>'+body+'</div>';
-feedback.focus({preventScroll:true});
+function renderComposer(){
+  const target=state.tasks.find(t=>t.id===state.draftTarget);
+  $('correctionHint').hidden=!target;
+  $('correctionHint').innerHTML=target?'<strong>Korrektur zu Text #'+target.number+'</strong><span>Dein anderer Entwurf bleibt erhalten.</span><button id="freeTextBtn" class="text-btn">Zurück zum freien Schreiben</button>':'';
+  $('freeTextBtn')?.addEventListener('click',()=>switchToFree());
+  $('rewardLabel').textContent=target?'✦ +10 XP · +5 HP für diese Korrektur':'✦ +15 XP · +5 HP';
+  $('penaltyLabel').textContent=target?'♥ Keine weitere Strafe für Text #'+target.number:'♥ −5 HP bei Fehler';
+  submit.disabled=exiting;
+  submit.innerHTML=target?'Korrektur einreihen <span>→</span>':'Text einreihen <span>→</span>';
+  $('inspireBtn').disabled=exiting;
+  $('importSaveBtn').disabled=exiting||Model.openCount(state)>0;
 }
-function setBusy(value){
-running=value;submit.disabled=value||exiting;$('importSaveBtn').disabled=value||exiting;cancel.hidden=!value;$('processing').hidden=!value;$('inspireBtn').disabled=value;clearInterval(ticker);
-if(value){started=Date.now();$('timer').textContent='0 s';$('processingTitle').textContent='Das Orakel prüft deinen Text …';$('processingDetail').textContent='Ein KI-Aufruf · keine Chat-Übergabe';
-ticker=setInterval(()=>{$('timer').textContent=Math.floor((Date.now()-started)/1000)+' s';},1000);}
+function taskStatus(task){
+  if(task.status==='queued')return state.queuePaused?'Pausiert':'Wartet';
+  return {checking:'Wird geprüft',retrying:'Verbindung wird erneut versucht',correct:'Richtig',incorrect:task.resolved?'Verbessert':'Fehler gefunden',uncertain:'Noch unsicher',error:'Prüfung nicht möglich',cancelled:'Abgebrochen'}[task.status]||task.status;
+}
+function wordDiff(before,after){
+  const a=before.split(/\s+/),b=after.split(/\s+/);
+  if(a.length*b.length>100000)return esc(after);
+  const dp=Array.from({length:a.length+1},()=>new Uint16Array(b.length+1));
+  for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]+1:Math.max(dp[i-1][j],dp[i][j-1]);
+  let i=a.length,j=b.length,out=[];
+  while(i||j){if(i&&j&&a[i-1]===b[j-1]){out.unshift(esc(b[--j]));i--;}else if(j&&(!i||dp[i][j-1]>=dp[i-1][j]))out.unshift('<mark>'+esc(b[--j])+'</mark>');else out.unshift('<del>'+esc(a[--i])+'</del>');}
+  return out.join(' ');
+}
+function renderTasks(){
+  const waiting=state.tasks.filter(t=>t.status==='queued');
+  const active=state.tasks.filter(t=>['checking','retrying'].includes(t.status));
+  const finished=state.tasks.filter(t=>!Model.isOpen(t));
+  const open=waiting.length+active.length;
+  const summary=state.queuePaused?'Prüfung pausiert · '+open+' Texte offen':open?active.length+' in Prüfung · '+waiting.length+' warten':'Alle Prüfungen abgeschlossen';
+  $('queueSummary').textContent=summary;
+  $('queueInline').textContent=open?summary:'Bereit für deinen nächsten Text';
+  $('queueHelp').textContent=state.queuePaused?(state.pauseReason+' Du kannst weiter Texte einreihen.'):'Die Texte werden nacheinander geprüft. Du kannst währenddessen weiterschreiben.';
+  $('resumeQueueBtn').hidden=!state.queuePaused;
+  $('cancelAllBtn').hidden=open<2;
+  const displayed=[...state.tasks.filter(Model.isOpen).sort((a,b)=>a.number-b.number),...finished.sort((a,b)=>b.number-a.number)];
+  $('taskList').innerHTML=displayed.length?displayed.map(task=>{
+    const root=Model.rootTask(state,task),pending=Model.isOpen(task),busy=root&&Model.correctionBusy(state,root.id);
+    const result=task.result;
+    const waitingIndex=waiting.findIndex(t=>t.id===task.id);
+    let detail='';
+    if(task.status==='queued')detail=state.queuePaused?'Wird nach dem Fortsetzen geprüft.':'Platz '+(waitingIndex+1)+' in der Warteschlange.';
+    else if(['checking','retrying'].includes(task.status))detail=task.detail||'Du kannst sofort deinen nächsten Text schreiben.';
+    else if(task.status==='error'||task.status==='cancelled')detail=task.detail;
+    let resultHtml=result?'<p class="task-explanation">'+esc(result.explanation)+'</p>':'';
+    if(result?.errors?.length)resultHtml+='<ul>'+result.errors.map(e=>'<li>'+esc(e.explanation)+'</li>').join('')+'</ul>';
+    if(task.status==='incorrect'&&task.resolved)resultHtml+='<p class="task-resolved">Durch eine Korrektur gemeistert.</p>';
+    const actions=[];
+    if(pending)actions.push('<button class="text-btn" data-action="cancel" data-task-id="'+esc(task.id)+'">Abbrechen</button>');
+    if(task.status==='incorrect'&&root&&!root.resolved){
+      actions.push('<button class="secondary" data-action="correct" data-task-id="'+esc(task.id)+'"'+(busy||exiting?' disabled':'')+'>'+(busy?'Korrektur ist eingereiht':'Diesen Text korrigieren')+'</button>');
+    }
+    if(['error','cancelled','uncertain'].includes(task.status)&&(!task.correctionOf||!root?.resolved))actions.push('<button class="secondary" data-action="retry" data-task-id="'+esc(task.id)+'"'+(exiting?' disabled':'')+'>Erneut einreihen</button>');
+    if(task.status==='incorrect'&&result?.correctedSentence)actions.push('<button class="text-btn" data-action="solution" data-task-id="'+esc(task.id)+'">'+(task.showSolution?'Lösung ausblenden':'Korrektur ansehen')+'</button>');
+    const solution=task.showSolution&&result?.correctedSentence?'<div class="diff"><span class="correction-label">Änderungen</span><p>'+wordDiff(task.sentence,result.correctedSentence)+'</p></div>':'';
+    const elapsed=task.startedAt&&pending?Math.max(0,Math.floor((Date.now()-task.startedAt)/1000)):null;
+    return '<article class="task-card '+esc(task.status)+(task.resolved?' resolved':'')+'" id="job-'+esc(task.id)+'"><div class="task-heading"><strong>Text #'+task.number+'</strong>'+(task.correctionOf&&root?'<span class="task-relation">Korrektur zu #'+root.number+'</span>':'')+'<span class="task-status">'+(task.status==='checking'?'<span class="small-spinner" aria-hidden="true"></span>':'')+esc(taskStatus(task))+'</span></div><p class="task-sentence">'+esc(task.sentence)+'</p>'+(detail?'<p class="task-detail">'+esc(detail)+(elapsed!==null?' <span data-job-time="'+esc(task.id)+'">'+elapsed+' s</span>':'')+'</p>':'')+resultHtml+solution+'<div class="task-bottom"><span class="task-delta">'+esc(task.delta)+'</span><div class="task-actions">'+actions.join('')+'</div></div></article>';
+  }).join(''):'<p class="history-empty">Deine eingereichten Texte erscheinen hier – jeder mit seinem eigenen Ergebnis.</p>';
+}
+function render(){
+  const level=Math.floor(state.xp/100)+1,p=state.xp%100;
+  $('hpText').textContent=state.hp+' / 100';$('hpBar').value=state.hp;
+  $('xpText').textContent=p+' / 100 XP';$('xpBar').value=p;$('level').textContent=level;$('streak').textContent=state.streak;
+  $('xpNote').textContent='Noch '+(100-p)+' XP bis Stufe '+(level+1);
+  $('hpNote').textContent=state.hp===0?'Zweite Chance: Verbessere einen Text und gewinne HP zurück.':'Punkte und HP werden nach jeder Prüfung gewertet.';
+  $('rank').textContent=level<3?'Wortwanderer':level<5?'Satzschmied':level<10?'Sprachritter':'Meister der Worte';
+  $('journey').textContent=state.mastered.length?'Du hast '+state.mastered.length+' Texte gemeistert.':'Die erste Etappe beginnt mit einem Satz.';
+  $('masteredCount').textContent=state.mastered.length+' Texte';$('checksCount').textContent=state.checks;
+  $('questTitle').textContent=missions[state.mission].title;$('questText').textContent=missions[state.mission].text;
+  $('history').innerHTML=state.history.length?state.history.slice(0,20).map(r=>'<article class="history-item '+(r.verdict==='incorrect'?'incorrect':'')+'"><span class="history-icon">'+(r.verdict==='correct'?'✓':r.verdict==='incorrect'?'✕':'◇')+'</span><div><p>'+(r.number?'#'+r.number+' · ':'')+esc(r.sentence)+'</p><small>'+esc(r.explanation)+' · '+new Date(r.time).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+'</small></div><span class="history-delta">'+esc(r.delta)+'</span></article>').join(''):'<p class="history-empty">Dein nächster Satz schreibt Geschichte.</p>';
+  renderComposer();renderTasks();count();
+}
+function switchToFree(){
+  if(state.draftTarget)state.correctionDrafts[state.draftTarget]=input.value;
+  state.draftTarget=null;input.value=state.freeDraft||'';save();renderComposer();count();input.focus();
+}
+function editCorrection(task){
+  const root=Model.rootTask(state,task);
+  if(!root||root.resolved||Model.correctionBusy(state,root.id)){notice('Für diesen Text ist bereits eine Korrektur eingereiht oder abgeschlossen.');return;}
+  if(state.draftTarget===root.id){input.focus();return;}
+  if(state.draftTarget)state.correctionDrafts[state.draftTarget]=input.value;else state.freeDraft=input.value;
+  state.draftTarget=root.id;input.value=state.correctionDrafts[root.id]??task.sentence;
+  save();renderComposer();count();input.focus();notice('Du korrigierst jetzt Text #'+root.number+'. Dein anderer Entwurf ist gespeichert.');
+}
+function submitText(){
+  if(exiting)return;
+  const sentence=input.value.trim();if(!sentence){input.focus();return;}
+  try{
+    const target=state.draftTarget;
+    const task=Model.enqueue(state,sentence,target);
+    if(target){delete state.correctionDrafts[target];state.draftTarget=null;input.value=state.freeDraft||'';}
+    else{input.value='';state.freeDraft='';}
+    save();render();notice('Text #'+task.number+' ist eingereiht. Du kannst sofort weiterschreiben.');playSound('check');input.focus();pump();
+  }catch(error){notice(error.message);playSound('reminder');}
 }
 function wait(ms,signal){return new Promise((resolve,reject)=>{
-const done=()=>{signal.removeEventListener('abort',abort);resolve();};
-const timer=setTimeout(done,ms);
-const abort=()=>{clearTimeout(timer);reject(new DOMException('Abgebrochen','AbortError'));};
-signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
+  const done=()=>{signal.removeEventListener('abort',abort);resolve();};
+  const timer=setTimeout(done,ms);
+  const abort=()=>{clearTimeout(timer);reject(new DOMException('Abgebrochen','AbortError'));};
+  signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
 });}
-async function requestGrade(sentence,signal){
-let attempt=0;
-while(true){
-attempt++;
-try{
-const response=await fetch('/api/check',{method:'POST',headers:{'Content-Type':'application/json','X-Game-Token':document.querySelector('meta[name="game-token"]').content},body:JSON.stringify({sentence}),signal});
-const data=await response.json();
-if(!response.ok){const error=new Error(data.error||'Prüfung fehlgeschlagen.');error.retryable=!!data.retryable;throw error;}
-return data;
-}catch(error){
-if(signal.aborted||error.name==='AbortError')throw error;
-if(error.retryable===false)throw error;
-const delay=Math.min(30000,3000*attempt);
-$('processingTitle').textContent='Verbindung wird erneut versucht …';
-$('processingDetail').textContent='Versuch '+(attempt+1)+' in '+Math.ceil(delay/1000)+' s. Du kannst jederzeit abbrechen.';
-await wait(delay,signal);
-$('processingTitle').textContent='Das Orakel prüft deinen Text …';$('processingDetail').textContent='Verbindungsversuch '+(attempt+1);
-}
-}}
-function wordDiff(before,after){
-const a=before.split(/\s+/),b=after.split(/\s+/);
-if(a.length*b.length>100000)return esc(after);
-const dp=Array.from({length:a.length+1},()=>new Uint16Array(b.length+1));
-for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]+1:Math.max(dp[i-1][j],dp[i][j-1]);
-let i=a.length,j=b.length,out=[];
-while(i||j){if(i&&j&&a[i-1]===b[j-1]){out.unshift(esc(b[--j]));i--;}else if(j&&(!i||dp[i][j-1]>=dp[i-1][j]))out.unshift('<mark>'+esc(b[--j])+'</mark>');else out.unshift('<del>'+esc(a[--i])+'</del>');}
-return out.join(' ');
-}
-function record(sentence,verdict,delta,explanation){state.history.unshift({sentence,verdict,delta,explanation,time:Date.now()});state.history=state.history.slice(0,40);}
-function applyGrade(result,sentence,wasCorrection){
-state.checks++;
-if(result.verdict==='uncertain'){
-record(sentence,'uncertain','Keine Wertung',result.explanation);
-playSound('reminder');
-showFeedback('neutral','Noch kein sicheres Urteil','<p>'+esc(result.explanation)+'</p><p>Dein Spielstand bleibt gleich. Du kannst erneut prüfen.</p>');
-}else if(result.verdict==='correct'){
-const oldLevel=Math.floor(state.xp/100)+1,xp=wasCorrection?10:15,hp=Math.min(5,100-state.hp);
-state.xp+=xp;state.hp+=hp;state.streak++;state.mastered.push(key(sentence));state.mastered=state.mastered.slice(-500);state.pending=null;
-record(sentence,'correct','+'+xp+' XP'+(hp?' · +'+hp+' HP':''),wasCorrection?'Erfolgreich verbessert':'Fehlerfrei');
-showFeedback('',wasCorrection?'Fehler gemeistert!':'Ein starker Satz.','<p>'+esc(sentence)+'</p><p>'+esc(result.explanation)+'</p>','+'+xp+' XP'+(hp?' · +'+hp+' HP':''));
-if(Math.floor(state.xp/100)+1>oldLevel){playSound('level');toast('Stufe '+(Math.floor(state.xp/100)+1)+' erreicht!');}
-else {playSound(wasCorrection?'recover':'success');}
-if(Math.floor(state.xp/100)+1===oldLevel && state.streak>0&&state.streak%3===0)toast(state.streak+' Texte in Folge gemeistert!');
-if(input.value.trim()===sentence)input.value='';
-state.mission=(state.mission+1)%missions.length;
-}else{
-const loss=wasCorrection?0:Math.min(5,state.hp);state.hp-=loss;state.streak=0;playSound('failure');
-state.pending={original:sentence,hint:result.errors.map(e=>e.explanation).join(' ')};
-const delta=loss?'−'+loss+' HP':'Keine weitere Strafe';record(sentence,'incorrect',delta,result.explanation);
-const errors=result.errors.map(e=>'<li>'+esc(e.explanation)+'</li>').join('');
-showFeedback('incorrect','Ein Schritt zum nächsten Level','<p>'+esc(result.explanation)+'</p><ul>'+errors+'</ul><button id="solutionBtn" class="secondary">Korrektur ansehen</button><div id="solution" class="diff" hidden><span class="correction-label">Änderungen</span><p>'+wordDiff(sentence,result.correctedSentence)+'</p></div><p>Verbessere deinen Text und prüfe ihn noch einmal: +10 XP und +5 HP.</p>',delta);
-$('solutionBtn').addEventListener('click',()=>{$('solution').hidden=!$('solution').hidden;$('solutionBtn').textContent=$('solution').hidden?'Korrektur ansehen':'Korrektur ausblenden';});
-}
-save();render();
-}
-async function evaluate(){
-if(running||exiting)return;
-const sentence=input.value.trim();if(!sentence){input.focus();return;}
-if(state.mastered.includes(key(sentence))){playSound('reminder');showFeedback('neutral','Diesen Text hast du schon gemeistert.','<p>Versuche eine neue Formulierung. Für denselben Text gibt es nur einmal Punkte.</p>');return;}
-playSound('check');
-const wasCorrection=!!state.pending;controller=new AbortController();setBusy(true);feedback.innerHTML='';
-try{
-const result=await requestGrade(sentence,controller.signal);
-if(controller.signal.aborted)return;
-applyGrade(result,sentence,wasCorrection);
-}catch(error){
-if(error.name==='AbortError'||controller.signal.aborted)showFeedback('neutral','Prüfung abgebrochen','<p>Keine Wertung. Dein Text bleibt erhalten.</p>');
-else showFeedback('neutral','Prüfung gerade nicht möglich','<p>'+esc(error.message)+'</p><p>Keine Wertung. Dein Text und Spielstand bleiben erhalten.</p>');
-}finally{setBusy(false);controller=null;input.focus();}
-}
-submit.addEventListener('click',evaluate);cancel.addEventListener('click',()=>controller?.abort());
-$('exitBtn').addEventListener('click',async()=>{
-exiting=true;controller?.abort();save();
-try{await fetch('/api/quit',{method:'POST',headers:{'X-Game-Token':document.querySelector('meta[name="game-token"]').content}});}catch{}
-$('connectionText').textContent='Spiel beendet';submit.disabled=true;$('connectionDot').parentElement.classList.remove('ready');
-showFeedback('neutral','Bis zum nächsten Abenteuer.','<p>Dein Spielstand ist gespeichert. Schließe das Fenster und setze später mit „Spiel starten“ fort.</p>');
-});
-async function health(){
-try{
-const response=await fetch('/api/health'),data=await response.json();
-if(data.available){$('connectionText').textContent='ChatGPT bereit';$('connectionDot').parentElement.classList.add('ready');}
-else{$('connectionText').textContent='Codex fehlt';showFeedback('neutral','Einmalige Einrichtung nötig','<p>Bitte Codex installieren und mit deinem ChatGPT-Konto anmelden. Hinweise stehen in „Lies mich“.</p>');}
-}catch{$('connectionText').textContent='Lokale Verbindung fehlt';}
-}
-
-function readBackup(data){
-  if(!data||data.format!=='schicksalsprobe-save'||data.version!==1||!data.state)throw Error('Das ist keine unterstützte Schicksalsprobe-Sicherung.');
-  const s=data.state;
-  for(const [name,max] of [['hp',100],['xp',100000000],['streak',100000000],['checks',100000000],['mission',missions.length-1]]){
-    if(!Number.isInteger(s[name])||s[name]<0||s[name]>max)throw Error('Ungültiger Wert im Spielstand: '+name);
+async function requestGrade(task,signal){
+  let attempt=0;
+  while(true){
+    attempt++;task.attempts=attempt;
+    try{
+      const response=await fetch('/api/check',{method:'POST',headers:{'Content-Type':'application/json','X-Game-Token':document.querySelector('meta[name="game-token"]').content},body:JSON.stringify({sentence:task.sentence}),signal});
+      const data=await response.json();
+      if(!response.ok){const error=new Error(data.error||'Prüfung fehlgeschlagen.');error.retryable=!!data.retryable;error.status=response.status;throw error;}
+      try{Model.assertResult(data,task.sentence);}catch(error){error.retryable=true;throw error;}
+      return data;
+    }catch(error){
+      if(signal.aborted||error.name==='AbortError')throw error;
+      if(error.retryable===false)throw error;
+      const delay=Math.min(30000,3000*attempt);
+      task.status='retrying';task.detail='Verbindungsversuch '+(attempt+1)+' in '+Math.ceil(delay/1000)+' s. Du kannst weiter schreiben oder diesen Auftrag abbrechen.';
+      save();renderTasks();await wait(delay,signal);
+      if(signal.aborted)throw new DOMException('Abgebrochen','AbortError');
+      task.status='checking';task.detail='Verbindungsversuch '+(attempt+1);save();renderTasks();
+    }
   }
-  const text=(value,max)=>typeof value==='string'&&value.length<=max;
-  if(!text(s.draft,3000)||!Array.isArray(s.mastered)||s.mastered.length>500||s.mastered.some(x=>!text(x,3000)))throw Error('Ungültige Texte in der Sicherung.');
-  if(!Array.isArray(s.history)||s.history.length>40||s.history.some(r=>!r||!text(r.sentence,3000)||!text(r.explanation,20000)||!text(r.delta,200)||!['correct','incorrect','uncertain'].includes(r.verdict)||!Number.isFinite(r.time)))throw Error('Ungültige Chronik in der Sicherung.');
-  if(s.pending!==null&&(!s.pending||!text(s.pending.original,3000)||!text(s.pending.hint,20000)))throw Error('Ungültiger Korrekturversuch in der Sicherung.');
-  return {state:{hp:s.hp,xp:s.xp,streak:s.streak,checks:s.checks,mission:s.mission,draft:s.draft,mastered:[...s.mastered],history:s.history.map(r=>({sentence:r.sentence,explanation:r.explanation,delta:r.delta,verdict:r.verdict,time:r.time})),pending:s.pending?{original:s.pending.original,hint:s.pending.hint}:null},soundEnabled:typeof data.settings?.soundEnabled==='boolean'?data.settings.soundEnabled:soundEnabled};
 }
-function backupData(){
+async function processTask(task){
+  const controller=new AbortController();controllers.set(task.id,controller);
+  task.status='checking';task.startedAt=Date.now();task.detail='Dein Schreibfeld bleibt frei.';save();render();
+  try{
+    const result=await requestGrade(task,controller.signal);
+    if(controller.signal.aborted||leaving||exiting)return;
+    const scored=Model.complete(state,task,result);
+    if(scored){
+      const sound=scored.levelUp?'level':result.verdict==='correct'?(task.correctionOf?'recover':'success'):result.verdict==='incorrect'?'failure':'reminder';
+      playSound(sound);
+      $('queueAnnouncements').textContent='Text #'+task.number+': '+taskStatus(task)+'. '+task.delta;
+      if(scored.levelUp)toast('Stufe '+scored.level+' erreicht!');
+    }
+  }catch(error){
+    if(leaving||exiting)return;
+    if(controller.signal.aborted){if(Model.isOpen(task))Model.cancel(state,task.id);}
+    else if(Model.isOpen(task)){
+      task.status='error';task.detail=error.message;task.delta='Keine Wertung';task.finishedAt=Date.now();
+      if(error.retryable===false){state.queuePaused=true;state.pauseReason=error.message;}
+    }
+  }finally{
+    controllers.delete(task.id);
+    if(!leaving){save();render();pump();}
+  }
+}
+function pump(){
+  if(exiting||leaving||state.queuePaused||controllers.size)return;
+  const task=state.tasks.find(t=>t.status==='queued');
+  if(task)void processTask(task);
+}
+function cancelTask(id){
+  if(Model.cancel(state,id)){controllers.get(id)?.abort();save();render();pump();}
+}
+$('taskList').addEventListener('click',event=>{
+  const button=event.target.closest('button[data-task-id]');if(!button||exiting)return;
+  const task=state.tasks.find(t=>t.id===button.dataset.taskId);if(!task)return;
+  if(button.dataset.action==='cancel')cancelTask(task.id);
+  else if(button.dataset.action==='correct')editCorrection(task);
+  else if(button.dataset.action==='solution'){task.showSolution=!task.showSolution;save();renderTasks();}
+  else if(button.dataset.action==='retry'){
+    try{if(Model.retry(state,task.id)){save();render();pump();}}catch(error){notice(error.message);}
+  }
+});
+$('cancelAllBtn').addEventListener('click',()=>{
+  for(const task of state.tasks)if(Model.isOpen(task)){Model.cancel(state,task.id);controllers.get(task.id)?.abort();}
+  state.queuePaused=false;state.pauseReason='';save();render();
+});
+$('resumeQueueBtn').addEventListener('click',()=>{
+  if(exiting)return;state.queuePaused=false;state.pauseReason='';
+  const failed=[...state.tasks].reverse().find(t=>t.status==='error');
+  try{if(failed)Model.retry(state,failed.id);}catch{}
+  save();render();pump();
+});
+submit.addEventListener('click',submitText);
+input.addEventListener('input',()=>{count();save();});
+input.addEventListener('keydown',event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();submitText();}});
+$('inspireBtn').addEventListener('click',()=>{if(exiting)return;state.mission=(state.mission+1)%missions.length;playSound('idea');save();render();});
+function parkActive(){
+  for(const [id,controller] of controllers){
+    const task=state.tasks.find(t=>t.id===id);
+    if(task&&Model.isOpen(task)){task.status='queued';task.startedAt=null;task.detail='Wird beim nächsten Start fortgesetzt.';}
+    controller.abort();
+  }
   save();
-  return {format:'schicksalsprobe-save',version:1,exportedAt:new Date().toISOString(),settings:{soundEnabled},state:structuredClone(state)};
 }
+window.addEventListener('pagehide',()=>{leaving=true;parkActive();});
+$('exitBtn').addEventListener('click',async()=>{
+  exiting=true;parkActive();
+  try{await fetch('/api/quit',{method:'POST',headers:{'X-Game-Token':document.querySelector('meta[name="game-token"]').content}});}catch{}
+  $('connectionText').textContent='Spiel beendet';$('connectionDot').parentElement.classList.remove('ready');
+  notice('Spielstand und offene Texte sind gespeichert. Du kannst das Fenster schließen.');render();
+});
+setInterval(()=>{
+  for(const span of document.querySelectorAll('[data-job-time]')){
+    const task=state.tasks.find(t=>t.id===span.dataset.jobTime);
+    if(task?.startedAt)span.textContent=Math.max(0,Math.floor((Date.now()-task.startedAt)/1000))+' s';
+  }
+},1000);
+async function health(){
+  try{
+    const response=await fetch('/api/health'),data=await response.json();
+    $('connectionText').textContent=data.available?'ChatGPT bereit':'Codex fehlt';
+    if(data.available)$('connectionDot').parentElement.classList.add('ready');
+  }catch{$('connectionText').textContent='Lokale Verbindung fehlt';}
+}
+function backupData(){save();return Model.backup(state,soundEnabled);}
 $('exportSaveBtn').addEventListener('click',()=>{
   try{
     const blob=new Blob([JSON.stringify(backupData(),null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),link=document.createElement('a');
     link.href=url;link.download='schicksalsprobe-spielstand-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.json';
     document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-    toast('Spielstand als Datei gesichert.');
+    toast('Spielstand mit offenen Texten gesichert.');
   }catch(error){toast('Sicherung nicht möglich: '+error.message);}
 });
-$('importSaveBtn').addEventListener('click',()=>{if(running||exiting)return;$('importSaveFile').click();});
 let stagedBackup=null;
 function closeImport(){stagedBackup=null;$('importPreview').hidden=true;$('importSaveFile').value='';}
+$('importSaveBtn').addEventListener('click',()=>{if(!exiting&&!Model.openCount(state))$('importSaveFile').click();});
 $('cancelImportBtn').addEventListener('click',closeImport);
 $('importSaveFile').addEventListener('change',async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{
     if(file.size>5000000)throw Error('Die Sicherungsdatei ist zu groß.');
-    stagedBackup=readBackup(JSON.parse(await file.text()));
-    if(running||exiting){closeImport();throw Error('Bitte warte, bis die laufende Prüfung beendet ist.');}
+    stagedBackup=Model.readBackup(JSON.parse(await file.text()),missions.length);
+    if(exiting||Model.openCount(state)){closeImport();throw Error('Bitte zuerst die offenen Prüfungen abschließen oder abbrechen.');}
     const s=stagedBackup.state;
-    $('importSummary').textContent=s.hp+' HP · '+s.xp+' XP · Stufe '+(Math.floor(s.xp/100)+1)+' · '+s.history.length+' Chronikeinträge';
+    $('importSummary').textContent=s.hp+' HP · '+s.xp+' XP · '+Model.openCount(s)+' offene Texte';
     $('importPreview').hidden=false;
   }catch(error){closeImport();toast('Spielstand nicht geladen: '+error.message);}
 });
 $('confirmImportBtn').addEventListener('click',()=>{
-  if(!stagedBackup||running||exiting)return;
+  if(!stagedBackup||exiting||Model.openCount(state))return;
   try{
     const incoming=stagedBackup;
-    // Retain the previous state before replacing it.
     localStorage.setItem(KEY+'_before_import',JSON.stringify(backupData()));
     localStorage.setItem(KEY,JSON.stringify(incoming.state));
     localStorage.setItem(KEY+'_sound',incoming.soundEnabled?'on':'off');
     state=incoming.state;input.value=state.draft;soundEnabled=incoming.soundEnabled;
-    if(audioCtx&&audioMaster)audioMaster.gain.setValueAtTime(soundEnabled ? .28 : 0,audioCtx.currentTime);
-    closeImport();renderSound();render();save();feedback.innerHTML='';playSound('recover');toast('Spielstand wiederhergestellt.');
+    if(audioCtx&&audioMaster)audioMaster.gain.setValueAtTime(soundEnabled ? 0.28 : 0,audioCtx.currentTime);
+    closeImport();renderSound();render();save();feedback.innerHTML='';playSound('recover');toast('Spielstand wiederhergestellt.');pump();
   }catch(error){toast('Spielstand konnte nicht geladen werden: '+error.message);}
 });
+render();health();pump();
 
-render();health();
 })();

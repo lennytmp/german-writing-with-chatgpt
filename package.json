@@ -1,10 +1,11 @@
 {
   "name": "deutsche-schicksalsprobe",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Lokales Deutsch-Schreibspiel mit HP, XP und Codex-Grammatikprüfung",
   "scripts": {
-    "start": "node server.cjs"
+    "start": "node server.cjs",
+    "test": "node --test test-queue.cjs"
   },
   "engines": {
     "node": ">=20"

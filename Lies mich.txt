@@ -12,7 +12,10 @@ Kein separater API-Schlüssel. Die KI-Prüfung erfolgt online über dein ChatGPT
 
 SPIELREGELN
 Schreibe frei oder nutze den Schreibimpuls.
-„Text prüfen“ bzw. Strg+Enter prüft direkt im Spiel.
+„Text einreihen“ bzw. Strg+Enter schickt deinen Text ab. Du kannst sofort den nächsten Text schreiben.
+Jeder Text erhält eine Nummer und eine eigene Ergebniskarte.
+Eine Prüfung läuft im Hintergrund; weitere Texte warten sichtbar in der Warteschlange.
+Über „Überarbeiten“ an einer Karte korrigierst du genau diesen Text. Dein freier Entwurf bleibt erhalten.
 Fehlerfrei: +15 XP und +5 HP. Maximal 100 HP.
 Sichere Fehler: −5 HP pro neuer Runde. Weitere Überarbeitungen derselben Runde kosten keine zusätzlichen HP.
 Erfolgreiche Korrektur: +10 XP und +5 HP.
@@ -21,14 +24,14 @@ Keine lokalen Grammatikregeln, keine Strafe für bloße Stilvorlieben oder unsic
 Letzter bekannter Spielstand: 95 HP, 0 XP. Dein Korrekturversuch ist übernommen.
 
 WARTEZEIT
-Ein einziger KI-Aufruf pro Text. Codex benötigt Anlaufzeit; sofortige Antworten werden nicht garantiert.
+Ein KI-Auftrag pro Text, nacheinander im Hintergrund. Codex benötigt Anlaufzeit; sofortige Antworten werden nicht garantiert.
 Vorübergehende Verbindungsfehler werden ohne feste Versuchszahl wiederholt. Du kannst jederzeit abbrechen.
 Anmelde- und Kontingentprobleme werden als solche angezeigt.
 
 BEENDEN UND DATEN
 Der Ausschaltknopf oben rechts beendet den lokalen Dienst.
 Nur das Fenster zu schließen lässt ihn für einen schnellen Neustart weiterlaufen.
-Spielstände werden lokal in diesem Browser gespeichert. Ein anderer Browser oder gelöschte Browserdaten können den Spielstand entfernen.
+Spielstände, Entwürfe und Warteschlange werden lokal in diesem Browser gespeichert. Unterbrochene Prüfungen werden beim nächsten Öffnen erneut eingereiht. Ein anderer Browser oder gelöschte Browserdaten können den Spielstand entfernen.
 Der Dienst lauscht nur auf 127.0.0.1:8787. Texte werden zur Prüfung an OpenAI gesendet.
 Codex verwaltet die Anmeldung. Das Spiel kopiert keine Zugangsdaten.
 KI-Bewertungen bleiben fehlbar.
