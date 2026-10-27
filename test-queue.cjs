@@ -31,13 +31,13 @@ test('Cancelling a task prevents late results from changing health or XP',()=>{
 test('Two incorrect texts have independent correction roots',()=>{
   const s=fresh(),a=Model.enqueue(s,'Ich ist müde.'),b=Model.enqueue(s,'Du ist hier.');
   Model.complete(s,a,wrong(a.sentence,'Ich bin müde.'));Model.complete(s,b,wrong(b.sentence,'Du bist hier.'));
-  assert.equal(s.hp,90);
+  assert.equal(s.hp,70);
   const ca=Model.enqueue(s,'Ich bin müde.',a.id);Model.complete(s,ca,ok(ca.sentence));
-  assert(a.resolved);assert(!b.resolved);assert.equal(s.hp,95);assert.equal(s.xp,10);
+  assert(a.resolved);assert(!b.resolved);assert.equal(s.hp,70);assert.equal(s.xp,10);
   const cb=Model.enqueue(s,'Du ist hier.',b.id);Model.complete(s,cb,wrong(cb.sentence,'Du bist hier.'));
-  assert.equal(s.hp,95);
+  assert.equal(s.hp,70);
   const cb2=Model.enqueue(s,'Du bist hier.',b.id);Model.complete(s,cb2,ok(cb2.sentence));
-  assert(b.resolved);assert.equal(s.hp,100);assert.equal(s.xp,20);
+  assert(b.resolved);assert.equal(s.hp,70);assert.equal(s.xp,20);
 });
 test('A second correction for the same root cannot be queued simultaneously',()=>{
   const s=fresh(),t=Model.enqueue(s,'Ich ist müde.');Model.complete(s,t,wrong(t.sentence,'Ich bin müde.'));
@@ -91,15 +91,17 @@ test('Contradictory AI response does not mutate game state',()=>{
   assert.throws(()=>Model.complete(s,t,ok('Changed.')),/Widersprüchliche/);
   assert.equal(s.checks,0);assert.equal(s.xp,0);assert.equal(t.status,'queued');
 });
-function setupUI(){
+function setupUI({hp=100,audio=false}={}){
+  const frequencies=[];
+  class TestAudio{constructor(){this.state="running";this.currentTime=0;this.destination={};}createGain(){return {gain:{value:1,setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}createOscillator(){return {frequency:{setValueAtTime(f){frequencies.push(f);},exponentialRampToValueAtTime(){}},connect(){},disconnect(){},start(){},stop(){}};}}
   const elements={},events={},requests=[],memory=new Map();
   function element(){return {value:'',hidden:false,disabled:false,textContent:'',innerHTML:'',dataset:{},events:{},focusCount:0,classList:{add(){},remove(){}},parentElement:{classList:{add(){},remove(){}}},setAttribute(){},addEventListener(n,f){this.events[n]=f;},focus(){this.focusCount++;}};}
   const html=fs.readFileSync(__dirname+'/index.html','utf8');
   for(const match of html.matchAll(/id="([^"]+)"/g))elements[match[1]]=element();
-  memory.set('schicksalsprobe_local_v4',JSON.stringify(raw()));
+  memory.set('schicksalsprobe_local_v4',JSON.stringify(raw({hp})));
   const context=vm.createContext({
     document:{getElementById:id=>elements[id]||null,querySelector:s=>({content:'test-token'}),querySelectorAll:()=>[]},
-    window:{SchicksalState:Model,addEventListener(n,f){events[n]=f;}},
+    window:{SchicksalState:Model,AudioContext:audio?TestAudio:undefined,addEventListener(n,f){events[n]=f;}},
     localStorage:{getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)},
     JSON,Date,Math,Map,Uint16Array,Promise,AbortController,DOMException,Blob,URL,
     setTimeout,clearTimeout,setInterval:()=>1,clearInterval(){},
@@ -117,7 +119,7 @@ function setupUI(){
   vm.runInContext(script,context);
   async function finish(index,result,status=200){requests[index].resolve({ok:status===200,status,json:async()=>result});await tick();}
   async function cleanup(){events.pagehide();await tick();}
-  return {elements,requests,ui:context.uiTest,memory,finish,cleanup,events};
+  return {frequencies,elements,requests,ui:context.uiTest,memory,finish,cleanup,events};
 }
 test('UI frees the editor instantly and keeps three submissions while one checks',async()=>{
   const u=setupUI();
@@ -142,7 +144,7 @@ test('Later results never erase or refocus the next draft; corrections stay atta
   await u.finish(2,ok('Du lernst.'));
   assert.equal(u.requests[3].sentence,'Ich bin müde.');
   await u.finish(3,ok('Ich bin müde.'));
-  assert.equal(u.ui.getState().xp,40);assert.equal(u.ui.getState().hp,100);assert(bad.resolved);
+  assert.equal(u.ui.getState().xp,40);assert.equal(u.ui.getState().hp,90);assert(bad.resolved);
   assert.equal(u.elements.sentence.value,'Mein vierter, noch ungesendeter Entwurf');
   await u.cleanup();
 });
@@ -184,4 +186,46 @@ test('Closing the page preserves unfinished checks for recovery',async()=>{
   const saved=JSON.parse(u.memory.get('schicksalsprobe_local_v4')),restored=Model.hydrate(saved);
   assert.equal(restored.draft,'Nicht gesendeter Entwurf');assert.equal(Model.openCount(restored),2);
   assert(restored.tasks.every(t=>t.status==='queued'));
+});
+
+test('One wound takes three fresh correct texts; corrections give XP without healing',()=>{
+  const s=fresh(),bad=Model.enqueue(s,'Ich ist hier.');Model.complete(s,bad,wrong(bad.sentence,'Ich bin hier.'));
+  assert.equal(s.hp,85);
+  const correction=Model.enqueue(s,'Ich bin hier.',bad.id);Model.complete(s,correction,ok(correction.sentence));
+  assert.equal(s.hp,85);assert.equal(s.xp,10);
+  for(let n=1;n<=3;n++){const t=Model.enqueue(s,'Richtiger Text '+n+'.');Model.complete(s,t,ok(t.sentence));assert.equal(s.hp,85+n*5);}
+});
+test('Zero HP ends the run and late results cannot revive it; restart preserves progress',()=>{
+  const s=Model.hydrate(raw({hp:10,xp:125,draft:'Mein Entwurf'}));
+  const bad=Model.enqueue(s,'Ich ist hier.'),waiting=Model.enqueue(s,'Ich lerne.');
+  Model.complete(s,bad,wrong(bad.sentence,'Ich bin hier.'));assert.equal(s.hp,0);
+  assert.equal(Model.complete(s,waiting,ok(waiting.sentence)),null);assert.equal(s.hp,0);
+  assert.throws(()=>Model.enqueue(s,'Neuer Text.'),/beendet/);
+  const restored=Model.readBackup(Model.backup(s,true)).state;assert.equal(restored.hp,0);
+  assert(Model.restart(restored));assert.equal(restored.hp,100);assert.equal(restored.xp,125);assert.equal(restored.draft,'Mein Entwurf');
+  assert.equal(Model.openCount(restored),1);assert(!Model.restart(restored));
+});
+test('Game over stops the queue until restart and preserves the writing draft',async()=>{
+  const u=setupUI({hp:10});u.elements.sentence.value='Ich ist hier.';u.ui.submitText();
+  u.elements.sentence.value='Ich lerne.';u.ui.submitText();u.elements.sentence.value='Mein Entwurf';
+  await u.finish(0,wrong('Ich ist hier.','Ich bin hier.'));
+  assert.equal(u.requests.length,1);assert.equal(u.elements.submitBtn.disabled,true);assert.equal(u.elements.defeatPanel.hidden,false);
+  assert.equal(u.elements.sentence.value,'Mein Entwurf');
+  u.elements.restartBtn.events.click();assert.equal(u.requests.length,2);assert.equal(u.elements.defeatPanel.hidden,true);
+  assert.equal(u.elements.sentence.value,'Mein Entwurf');await u.cleanup();
+});
+test('Every incorrect verdict schedules an audible error cue, including failed corrections',async()=>{
+  const u=setupUI({audio:true});u.elements.sentence.value='Ich ist hier.';u.ui.submitText();
+  await u.finish(0,wrong('Ich ist hier.','Ich bin hier.'));
+  assert(u.frequencies.includes(311.13));assert(u.frequencies.includes(196));
+  const firstCount=u.frequencies.filter(f=>f===196).length;
+  u.ui.editCorrection(u.ui.getState().tasks[0]);u.elements.sentence.value='Ich sein hier.';u.ui.submitText();
+  await u.finish(1,wrong('Ich sein hier.','Ich bin hier.'));
+  assert.equal(u.frequencies.filter(f=>f===196).length,firstCount+1);assert.equal(u.ui.getState().hp,85);await u.cleanup();
+});
+
+test('Submitting an AI-suggested correction as free writing still cannot heal',()=>{
+  const s=fresh(),bad=Model.enqueue(s,'Ich ist hier.');Model.complete(s,bad,wrong(bad.sentence,'Ich bin hier.'));
+  const correction=Model.enqueue(s,'Ich bin hier.');assert.equal(correction.correctionOf,bad.id);
+  Model.complete(s,correction,ok(correction.sentence));assert.equal(s.hp,85);assert.equal(s.xp,10);assert(bad.resolved);
 });

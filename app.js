@@ -27,7 +27,8 @@ function playSound(kind){
     check:[[330,0,.09,.09],[440,.08,.12,.07]],
     success:[[523.25,0,.22,.22],[659.25,.10,.24,.22],[783.99,.20,.36,.21],[1046.5,.33,.48,.15]],
     recover:[[392,0,.20,.18],[523.25,.10,.23,.20],[659.25,.20,.28,.20],[783.99,.32,.48,.17]],
-    failure:[[130.81,0,.26,.20],[98,.12,.34,.16]],
+    failure:[[440,0,.12,.45],[311.13,.11,.18,.42],[196,.25,.32,.40]],
+    defeat:[[392,0,.25,.42],[311.13,.22,.28,.40],[261.63,.46,.30,.38],[130.81,.75,.70,.40]],
     level:[[523.25,0,.20,.20],[659.25,.10,.20,.20],[783.99,.20,.24,.20],[1046.5,.32,.28,.20],[1318.51,.46,.55,.14]],
     reminder:[[440,0,.18,.11],[554.37,.10,.24,.09]],
     idea:[[740,0,.08,.07],[880,.06,.12,.06]]
@@ -37,7 +38,7 @@ function playSound(kind){
     try{const now=ctx.currentTime+.012;
       for(const [frequency,offset,duration,volume] of notes){
         const oscillator=ctx.createOscillator(),gain=ctx.createGain(),start=now+offset;
-        oscillator.type=kind==='failure'?'sine':'triangle';
+        oscillator.type='triangle';
         oscillator.frequency.setValueAtTime(frequency,start);
         if(kind==='failure')oscillator.frequency.exponentialRampToValueAtTime(frequency*.65,start+duration);
         gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(volume,start+.012);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
@@ -91,9 +92,10 @@ function renderComposer(){
   $('correctionHint').hidden=!target;
   $('correctionHint').innerHTML=target?'<strong>Korrektur zu Text #'+target.number+'</strong><span>Dein anderer Entwurf bleibt erhalten.</span><button id="freeTextBtn" class="text-btn">Zurück zum freien Schreiben</button>':'';
   $('freeTextBtn')?.addEventListener('click',()=>switchToFree());
-  $('rewardLabel').textContent=target?'✦ +10 XP · +5 HP für diese Korrektur':'✦ +15 XP · +5 HP';
-  $('penaltyLabel').textContent=target?'♥ Keine weitere Strafe für Text #'+target.number:'♥ −5 HP bei Fehler';
-  submit.disabled=exiting;
+  $('rewardLabel').textContent=target?'✦ +10 XP · keine Heilung durch Korrekturen':'✦ +15 XP · +5 HP';
+  $('penaltyLabel').textContent=target?'♥ Keine weitere Strafe für Text #'+target.number:'♥ −15 HP bei Fehler';
+  submit.disabled=exiting||state.hp===0;
+  $('defeatPanel').hidden=state.hp>0;
   submit.innerHTML=target?'Korrektur einreihen <span>→</span>':'Text einreihen <span>→</span>';
   $('inspireBtn').disabled=exiting;
   $('importSaveBtn').disabled=exiting||Model.openCount(state)>0;
@@ -116,10 +118,10 @@ function renderTasks(){
   const active=state.tasks.filter(t=>['checking','retrying'].includes(t.status));
   const finished=state.tasks.filter(t=>!Model.isOpen(t));
   const open=waiting.length+active.length;
-  const summary=state.queuePaused?'Prüfung pausiert · '+open+' Texte offen':open?active.length+' in Prüfung · '+waiting.length+' warten':'Alle Prüfungen abgeschlossen';
+  const summary=state.hp===0?'Abenteuer beendet · '+open+' Texte warten auf deinen neuen Versuch':state.queuePaused?'Prüfung pausiert · '+open+(open===1?' Text offen':' Texte offen'):open?active.length+' in Prüfung · '+waiting.length+' warten':'Alle Prüfungen abgeschlossen';
   $('queueSummary').textContent=summary;
-  $('queueInline').textContent=open?summary:'Bereit für deinen nächsten Text';
-  $('queueHelp').textContent=state.queuePaused?(state.pauseReason+' Du kannst weiter Texte einreihen.'):'Die Texte werden nacheinander geprüft. Du kannst währenddessen weiterschreiben.';
+  $('queueInline').textContent=state.hp===0?'Abenteuer beendet – starte einen neuen Versuch':open?summary:'Bereit für deinen nächsten Text';
+  $('queueHelp').textContent=state.hp===0?'Bei 0 HP werden keine weiteren Texte geprüft. Nach „Neuer Versuch“ geht es mit den gespeicherten Texten weiter.':state.queuePaused?(state.pauseReason+' Du kannst weiter Texte einreihen.'):'Die Texte werden nacheinander geprüft. Du kannst währenddessen weiterschreiben.';
   $('resumeQueueBtn').hidden=!state.queuePaused;
   $('cancelAllBtn').hidden=open<2;
   const displayed=[...state.tasks.filter(Model.isOpen).sort((a,b)=>a.number-b.number),...finished.sort((a,b)=>b.number-a.number)];
@@ -151,7 +153,7 @@ function render(){
   $('hpText').textContent=state.hp+' / 100';$('hpBar').value=state.hp;
   $('xpText').textContent=p+' / 100 XP';$('xpBar').value=p;$('level').textContent=level;$('streak').textContent=state.streak;
   $('xpNote').textContent='Noch '+(100-p)+' XP bis Stufe '+(level+1);
-  $('hpNote').textContent=state.hp===0?'Zweite Chance: Verbessere einen Text und gewinne HP zurück.':'Punkte und HP werden nach jeder Prüfung gewertet.';
+  $('hpNote').textContent=state.hp===0?'0 HP – dein Abenteuer ist beendet.':state.hp<=30?'Lebensgefahr! Neue richtige Texte heilen je 5 HP.':'Eine Wunde: −15 HP. Drei neue richtige Texte heilen je 5 HP.';
   $('rank').textContent=level<3?'Wortwanderer':level<5?'Satzschmied':level<10?'Sprachritter':'Meister der Worte';
   $('journey').textContent=state.mastered.length?'Du hast '+state.mastered.length+' Texte gemeistert.':'Die erste Etappe beginnt mit einem Satz.';
   $('masteredCount').textContent=state.mastered.length+' Texte';$('checksCount').textContent=state.checks;
@@ -217,8 +219,14 @@ async function processTask(task){
     if(controller.signal.aborted||leaving||exiting)return;
     const scored=Model.complete(state,task,result);
     if(scored){
-      const sound=scored.levelUp?'level':result.verdict==='correct'?(task.correctionOf?'recover':'success'):result.verdict==='incorrect'?'failure':'reminder';
+      const sound=state.hp===0?'defeat':scored.levelUp?'level':result.verdict==='correct'?(task.correctionOf?'recover':'success'):result.verdict==='incorrect'?'failure':'reminder';
       playSound(sound);
+      if(result.verdict==='incorrect'){
+        $('hpBar').parentElement.classList.remove('damage-hit');
+        setTimeout(()=>$('hpBar').parentElement.classList.add('damage-hit'),0);
+        setTimeout(()=>$('hpBar').parentElement.classList.remove('damage-hit'),850);
+        toast(state.hp===0?'0 HP – Abenteuer beendet.':scored.hp<0?'Treffer! '+scored.hp+' HP. Drei neue richtige Texte heilen eine Wunde.':'Noch ein Fehler. Keine zusätzliche Strafe für diese Korrektur.');
+      }
       $('queueAnnouncements').textContent='Text #'+task.number+': '+taskStatus(task)+'. '+task.delta;
       if(scored.levelUp)toast('Stufe '+scored.level+' erreicht!');
     }
@@ -235,7 +243,7 @@ async function processTask(task){
   }
 }
 function pump(){
-  if(exiting||leaving||state.queuePaused||controllers.size)return;
+  if(exiting||leaving||state.hp===0||state.queuePaused||controllers.size)return;
   const task=state.tasks.find(t=>t.status==='queued');
   if(task)void processTask(task);
 }
@@ -261,6 +269,10 @@ $('resumeQueueBtn').addEventListener('click',()=>{
   const failed=[...state.tasks].reverse().find(t=>t.status==='error');
   try{if(failed)Model.retry(state,failed.id);}catch{}
   save();render();pump();
+});
+$('restartBtn').addEventListener('click',()=>{
+  if(exiting||!Model.restart(state))return;
+  save();render();playSound('recover');notice('Neuer Versuch mit 100 HP. Deine XP, Texte und Entwürfe bleiben erhalten.');pump();
 });
 submit.addEventListener('click',submitText);
 input.addEventListener('input',()=>{count();save();});

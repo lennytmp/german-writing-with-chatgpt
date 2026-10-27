@@ -9,6 +9,7 @@
 <div class="stat"><div class="stat-label"><span>✦ ERFAHRUNG</span><strong id="xpText">0 / 100 XP</strong></div><progress id="xpBar" max="100" value="0" aria-label="Erfahrung bis zum nächsten Level"></progress><small id="xpNote">Noch 100 XP bis Stufe 2</small></div>
 <div class="streak-stat"><span class="streak-icon">♨</span><strong id="streak">0</strong><small>SERIE</small></div>
 </section>
+<section id="defeatPanel" class="defeat-panel panel" aria-labelledby="defeatTitle" hidden><p class="eyebrow">0 HP · ABENTEUER BEENDET</p><h2 id="defeatTitle">Du bist gefallen.</h2><p>Weitere Prüfungen warten. Beginne einen neuen Versuch mit 100 HP. Deine XP, Texte und Entwürfe bleiben erhalten.</p><button id="restartBtn" class="primary">Neuer Versuch</button></section>
 <div class="play-layout">
 <section class="writing panel">
 <div class="section-head"><span class="eyebrow">DEINE SCHREIBMISSION</span><button id="inspireBtn" class="text-btn">↻ Neuer Impuls</button></div>
@@ -17,13 +18,13 @@
 <label class="sr-only" for="sentence">Dein deutscher Text</label>
 <textarea id="sentence" rows="5" maxlength="3000" placeholder="Schreibe deinen Satz oder einen kurzen Text …" spellcheck="false"></textarea>
 <div class="input-meta"><span id="wordCount">0 Wörter</span><span>Strg + Enter zum Prüfen</span></div>
-<div class="submit-row"><div class="stakes"><span id="rewardLabel">✦ +15 XP</span><span id="penaltyLabel">♥ −5 HP bei Fehler</span></div><button id="submitBtn" class="primary">Text einreihen <span>→</span></button></div>
+<div class="submit-row"><div class="stakes"><span id="rewardLabel">✦ +15 XP</span><span id="penaltyLabel">♥ −15 HP bei Fehler</span></div><button id="submitBtn" class="primary">Text einreihen <span>→</span></button></div>
 <p id="submitNotice" class="submit-notice" role="status" aria-live="polite">Absenden, weiterschreiben – die Prüfung läuft im Hintergrund.</p><div class="queue-inline"><span id="queueInline">Bereit für deinen nächsten Text</span><a href="#queueTitle">Prüfungen ansehen ↓</a></div>
 <div id="feedback" tabindex="-1" aria-live="polite"></div>
 </section>
 <aside class="side">
 <section class="panel adventure"><p class="eyebrow">DEIN WEG</p><div class="map" aria-hidden="true"><span class="map-star">✧</span><span class="map-path"></span><span class="map-node active">1</span><span class="map-node">2</span><span class="map-node">3</span><span class="map-castle">♜</span></div><h2 id="rank">Wortwanderer</h2><p id="journey">Die erste Etappe beginnt mit einem Satz.</p><div class="adventure-meta"><span>Gemeistert</span><strong id="masteredCount">0 Texte</strong></div><div class="adventure-meta"><span>Prüfungen</span><strong id="checksCount">0</strong></div></section>
-<section class="rules"><h3>So wirst du stärker</h3><p><b>+15 XP · +5 HP</b> für einen fehlerfreien Text.</p><p><b>−5 HP</b> für einen Text mit sicheren Fehlern.</p><p><b>+10 XP · +5 HP</b> wenn du ihn verbesserst.</p><p>Stilvorlieben und unsichere Bewertungen kosten keine HP.</p></section>
+<section class="rules"><h3>So wirst du stärker</h3><p><b>+15 XP · +5 HP</b> für einen fehlerfreien Text.</p><p><b>−15 HP</b> für einen Text mit sicheren Fehlern.</p><p><b>+10 XP · keine Heilung</b> wenn du ihn verbesserst.</p><p>Eine Wunde braucht drei neue richtige Texte zum Heilen. Bei 0 HP endet dein Versuch.</p><p>Stilvorlieben und unsichere Bewertungen kosten keine HP.</p></section>
 </aside>
 </div>
 <section class="queue-panel panel" aria-labelledby="queueTitle"><div class="section-head"><div><p class="eyebrow">ALLES BLEIBT ZUGEORDNET</p><h2 id="queueTitle">Deine Prüfungen</h2></div><strong id="queueSummary" class="queue-summary"></strong></div><p id="queueHelp" class="queue-help">Du kannst während der Prüfung weiterschreiben.</p><div class="queue-controls"><button id="resumeQueueBtn" class="secondary" hidden>Prüfungen fortsetzen</button><button id="cancelAllBtn" class="text-btn" hidden>Alle offenen Prüfungen abbrechen</button></div><div id="taskList"></div><p id="queueAnnouncements" class="sr-only" role="status" aria-live="polite"></p></section>

@@ -72,12 +72,17 @@ function rootTask(state,task){return state.tasks.find(t=>t.id===(task.correction
 function openCount(state){return state.tasks.filter(isOpen).length;}
 function correctionBusy(state,id){return state.tasks.some(t=>t.correctionOf===id&&isOpen(t));}
 function enqueue(state,sentence,correctionOf=null,now=Date.now()){
+  if(state.hp===0)throw Error('Dein Abenteuer ist beendet. Starte einen neuen Versuch.');
   sentence=sentence.trim();
   if(!sentence||sentence.length>3000)throw Error('Bitte 1 bis 3000 Zeichen schreiben.');
   if(state.mastered.includes(textKey(sentence)))throw Error('Diesen Text hast du schon gemeistert. Schreibe einen neuen Text.');
   const duplicate=state.tasks.find(t=>isOpen(t)&&textKey(t.sentence)===textKey(sentence));
   if(duplicate)throw Error('Dieser Text wartet bereits als Text #'+duplicate.number+'.');
   if(openCount(state)>=50)throw Error('50 Texte sind bereits offen. Warte kurz auf ein Ergebnis.');
+  if(!correctionOf){
+    const known=state.tasks.find(t=>t.status==='incorrect'&&!t.resolved&&t.result?.correctedSentence&&textKey(t.result.correctedSentence)===textKey(sentence));
+    if(known)correctionOf=known.correctionOf||known.id;
+  }
   const root=correctionOf?state.tasks.find(t=>t.id===correctionOf):null;
   if(correctionOf&&(!root||root.resolved||root.status!=='incorrect'))throw Error('Diese Korrektur ist nicht mehr offen. Wechsle zu einem neuen Text.');
   if(root&&correctionBusy(state,root.id))throw Error('Für Text #'+root.number+' läuft bereits eine Korrektur.');
@@ -91,7 +96,7 @@ function record(state,task,verdict,delta,explanation,now){
   state.history=state.history.slice(0,40);
 }
 function complete(state,task,result,now=Date.now()){
-  if(!isOpen(task)||task.settled)return null;
+  if(state.hp===0||!isOpen(task)||task.settled)return null;
   assertResult(result,task.sentence);
   task.result=copy(result);task.status=result.verdict;task.settled=true;task.finishedAt=now;task.detail='';
   state.checks++;
@@ -100,14 +105,14 @@ function complete(state,task,result,now=Date.now()){
   if(result.verdict==='correct'){
     const already=state.mastered.includes(textKey(task.sentence));
     if(!already){
-      xp=task.correctionOf?10:15;hp=Math.min(5,100-state.hp);state.xp+=xp;state.hp+=hp;state.streak++;
+      xp=task.correctionOf?10:15;hp=task.correctionOf?0:Math.min(5,100-state.hp);state.xp+=xp;state.hp+=hp;state.streak++;
       state.mastered.push(textKey(task.sentence));state.mastered=state.mastered.slice(-500);
     }
     task.resolved=true;
     const root=rootTask(state,task);if(root)root.resolved=true;
     task.delta=already?'Bereits gemeistert':'+'+xp+' XP'+(hp?' · +'+hp+' HP':'');
   }else if(result.verdict==='incorrect'){
-    hp=task.correctionOf?0:-Math.min(5,state.hp);state.hp+=hp;state.streak=0;
+    hp=task.correctionOf?0:-Math.min(15,state.hp);state.hp+=hp;state.streak=0;
     task.delta=hp?'−'+(-hp)+' HP':'Keine weitere Strafe';
   }else task.delta='Keine Wertung';
   record(state,task,result.verdict,task.delta,result.explanation,now);
@@ -118,6 +123,7 @@ function cancel(state,id,now=Date.now()){
   task.status='cancelled';task.finishedAt=now;task.detail='Abgebrochen. Du kannst diesen Text erneut einreihen.';task.delta='Keine Wertung';return true;
 }
 function retry(state,id){
+  if(state.hp===0)throw Error('Starte zuerst einen neuen Versuch.');
   const task=state.tasks.find(t=>t.id===id);if(!task||!['error','cancelled','uncertain'].includes(task.status))return false;
   if(state.mastered.includes(textKey(task.sentence)))throw Error('Dieser Text wurde inzwischen gemeistert.');
   if(openCount(state)>=50)throw Error('Die Warteschlange ist voll.');
@@ -129,6 +135,10 @@ function retry(state,id){
     if(correctionBusy(state,root.id))throw Error('Für diesen Text läuft bereits eine Korrektur.');
   }
   task.status='queued';task.result=null;task.settled=false;task.finishedAt=null;task.startedAt=null;task.attempts=0;task.delta='';task.detail='';return true;
+}
+function restart(state){
+  if(state.hp!==0)return false;
+  state.hp=100;state.streak=0;return true;
 }
 function prune(state){
   const keep=new Set(state.tasks.filter(t=>isOpen(t)||(t.status==='incorrect'&&!t.resolved)).map(t=>t.id));
@@ -144,5 +154,5 @@ function readBackup(data,missionCount=7){
   if(!data||data.format!=='schicksalsprobe-save'||![1,2].includes(data.version))throw Error('Keine unterstützte Schicksalsprobe-Sicherung.');
   return {state:hydrate(data.state,missionCount),soundEnabled:typeof data.settings?.soundEnabled==='boolean'?data.settings.soundEnabled:true};
 }
-return {textKey,isOpen,openCount,rootTask,correctionBusy,hydrate,enqueue,complete,cancel,retry,prune,backup,readBackup,assertResult};
+return {textKey,isOpen,openCount,rootTask,correctionBusy,hydrate,enqueue,complete,cancel,retry,restart,prune,backup,readBackup,assertResult};
 });

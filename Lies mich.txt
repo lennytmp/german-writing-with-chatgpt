@@ -17,8 +17,10 @@ Jeder Text erhält eine Nummer und eine eigene Ergebniskarte.
 Eine Prüfung läuft im Hintergrund; weitere Texte warten sichtbar in der Warteschlange.
 Über „Überarbeiten“ an einer Karte korrigierst du genau diesen Text. Dein freier Entwurf bleibt erhalten.
 Fehlerfrei: +15 XP und +5 HP. Maximal 100 HP.
-Sichere Fehler: −5 HP pro neuer Runde. Weitere Überarbeitungen derselben Runde kosten keine zusätzlichen HP.
-Erfolgreiche Korrektur: +10 XP und +5 HP.
+Sichere Fehler: −15 HP pro neuem Text. Weitere Überarbeitungen derselben Runde kosten keine zusätzlichen HP.
+Erfolgreiche Korrektur: +10 XP, keine Heilung.
+Drei neue fehlerfreie Texte heilen zusammen eine Wunde von 15 HP. Korrekturen heilen keine HP.
+Bei 0 HP endet der Versuch und die Warteschlange stoppt. „Neuer Versuch“ beginnt mit 100 HP; XP, Texte und Entwürfe bleiben erhalten.
 100 XP pro Level. Gemeisterte Texte geben nicht mehrfach Punkte.
 Keine lokalen Grammatikregeln, keine Strafe für bloße Stilvorlieben oder unsichere Urteile.
 Letzter bekannter Spielstand: 95 HP, 0 XP. Dein Korrekturversuch ist übernommen.

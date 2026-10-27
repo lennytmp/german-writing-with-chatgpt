@@ -39,9 +39,11 @@ Private Spielstanddateien, Laufzeitprotokolle und Zugangsdaten gehören nicht in
 ## Spielregeln
 
 - Fehlerfrei: +15 XP und +5 HP, maximal 100 HP.
-- Sichere Sprachfehler: einmalig −5 HP pro neuer Runde.
-- Erfolgreich überarbeitet: +10 XP und +5 HP; weitere Korrekturversuche kosten keine zusätzlichen HP.
-- 100 XP pro Level. Gemeisterte Texte geben nicht mehrfach Punkte.
+- Sichere Sprachfehler: einmalig −15 HP pro neuem Text.
+- Erfolgreich überarbeitet: +10 XP, keine Heilung; weitere Korrekturversuche kosten keine zusätzlichen HP.
+- Drei neue fehlerfreie Texte heilen zusammen eine Wunde von 15 HP. Korrekturen heilen keine HP.
+Bei 0 HP endet der Versuch und die Warteschlange stoppt. „Neuer Versuch“ beginnt mit 100 HP; XP, Texte und Entwürfe bleiben erhalten.
+100 XP pro Level. Gemeisterte Texte geben nicht mehrfach Punkte.
 - Stilvorlieben und unsichere Bewertungen werden nicht bestraft.
 - Ton kann oben ein- und ausgeschaltet werden. Es werden keine Audiodateien heruntergeladen.
 
